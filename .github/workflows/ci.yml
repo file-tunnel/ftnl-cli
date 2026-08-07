@@ -43,7 +43,7 @@ jobs:
         env:
           # Keep in step with the `flags2env` rev pinned in Cargo.toml, so the
           # audit and the linked parser are the same build.
-          FLAGS2ENV_REV: 8a978aef0cc9b12bdd0791d93bbf3a374c517ee2
+          FLAGS2ENV_REV: 8c8465561075a8d7ebb58074b3a8087138e97d8f
       - name: Audit the CLI contract
         run: /tmp/flags-2-env/build/flags2env audit .cli-flags.toml
       - name: Check the generated typed config for drift

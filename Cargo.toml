@@ -24,7 +24,7 @@ unsafe_code = "deny"
 # The CLI contract. `BundledFlags2Env` statically links the vendored C parser
 # through this crate's build script, so the released binary needs no
 # libflags2env at runtime and --help/completions render from .cli-flags.toml.
-flags2env = { git = "https://github.com/ORESoftware/flags-2-env.git", rev = "8a978aef0cc9b12bdd0791d93bbf3a374c517ee2" }
+flags2env = { git = "https://github.com/ORESoftware/flags-2-env.git", rev = "8c8465561075a8d7ebb58074b3a8087138e97d8f" }
 
 # Org dependencies — the same edges declared in `.zpkg.toml`, pinned by full rev
 # so a clone builds the code it was tested against.
