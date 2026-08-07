@@ -1,0 +1,48 @@
+# Cargo manifest for ftnl-cli: builds the `ftnl` binary and its library half.
+[package]
+name = "ftnl-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Command-line client for File Tunnel — create tunnels, send and receive files across devices"
+license = "MIT"
+repository = "https://github.com/file-tunnel/ftnl-cli"
+
+[lib]
+name = "ftnl_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ftnl"
+path = "src/main.rs"
+
+[lints.rust]
+# Denied, not forbidden: `src/help.rs` binds to the flags-2-env C core and opts
+# itself out with a module-level allow. Nothing else in the crate may.
+unsafe_code = "deny"
+
+[dependencies]
+# The CLI contract. `BundledFlags2Env` statically links the vendored C parser
+# through this crate's build script, so the released binary needs no
+# libflags2env at runtime and --help/completions render from .cli-flags.toml.
+flags2env = { git = "https://github.com/ORESoftware/flags-2-env.git", rev = "8a978aef0cc9b12bdd0791d93bbf3a374c517ee2" }
+
+# Org dependencies — the same edges declared in `.zpkg.toml`, pinned by full rev
+# so a clone builds the code it was tested against.
+#
+# Wire contract: TunnelStatus / FileStatus are decoded from the transport's
+# string fields here rather than being re-spelled as CLI string literals.
+ftnl-interfaces = { git = "https://github.com/file-tunnel/ftnl-interfaces.git", rev = "22cd738ac574e41b6a04188181387722fe709716" }
+# Transport: every request goes through the org client, so routes, capability
+# headers, and error mapping stay defined in one place.
+ftnl-client = { git = "https://github.com/file-tunnel/ftnl-clients.git", rev = "12bfc301f74cf103478966ae58ed80375459bbb2" }
+
+bytes = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+uuid = { version = "1", features = ["serde"] }
+
+[dev-dependencies]
+# `v4` is test-only: the CLI never mints an id, it only parses ones the server
+# issued.
+uuid = { version = "1", features = ["serde", "v4"] }

@@ -1,0 +1,145 @@
+# flags-2-env config — https://github.com/ORESoftware/flags-2-env
+#
+# This file is the CLI contract. The binary parses it directly on every
+# platform, and `--help`, shell completions, env-var names, types, and defaults
+# all render from it at runtime — there is no second copy in Rust to drift.
+#
+# Nothing secret is declared here. Capabilities and pairing secrets are
+# credentials, and a flag value is visible in `ps` output and shell history, so
+# they are environment-only and listed under `[env] ignore` below.
+
+[help]
+url = "https://github.com/file-tunnel/ftnl-cli"
+columns = ["options", "env", "type", "default", "description"]
+
+[parse]
+stop_at_first_positional = false
+allow_unknown = false
+
+[env]
+# Read directly from the environment by src/secrets.rs, never as flags.
+ignore = ["FTNL_CAPABILITY", "FTNL_PAIRING_URI"]
+
+[commands.create]
+help = "Create a tunnel and print its id and pairing URI (render it as a QR code)."
+
+[commands.create.flags.application-id]
+env = "FTNL_APPLICATION_ID"
+aliases = ["application-id", "app"]
+short = "a"
+type = "string"
+help = "Application id recorded on the tunnel."
+
+[commands.create.flags.accept]
+env = "FTNL_ACCEPT"
+aliases = ["accept"]
+type = "array"
+default = "[\"image/*\"]"
+help = "JSON array of accepted media types, e.g. '[\"image/*\",\"application/pdf\"]'."
+
+[commands.create.flags.max-files]
+env = "FTNL_MAX_FILES"
+aliases = ["max-files"]
+type = "integer"
+default = 10
+help = "Maximum files the tunnel will accept (1 through 1000)."
+
+[commands.create.flags.max-file-bytes]
+env = "FTNL_MAX_FILE_BYTES"
+aliases = ["max-file-bytes"]
+type = "integer"
+default = 52428800
+help = "Maximum size of a single file in bytes (1 through 5368709120)."
+
+[commands.create.flags.expires-in]
+env = "FTNL_EXPIRES_IN_SECONDS"
+aliases = ["expires-in"]
+short = "e"
+type = "integer"
+default = 600
+help = "Tunnel lifetime in seconds (30 through 86400)."
+
+[commands.status]
+help = "Show a tunnel's status and the files declared on it."
+aliases = ["snapshot"]
+
+[commands.send]
+help = "Declare and upload a local file to a tunnel (the phone side of the flow)."
+
+[commands.send.flags.file]
+env = "FTNL_FILE"
+aliases = ["file"]
+short = "f"
+type = "string"
+help = "Path of the local file to upload."
+
+[commands.send.flags.media-type]
+env = "FTNL_MEDIA_TYPE"
+aliases = ["media-type"]
+short = "m"
+type = "string"
+default = "application/octet-stream"
+help = "Media type declared for the upload."
+
+[commands.recv]
+help = "Download a file from a tunnel (the desktop side of the flow)."
+aliases = ["receive"]
+
+[commands.recv.flags.file-id]
+env = "FTNL_FILE_ID"
+aliases = ["file-id"]
+type = "string"
+help = "File id to download (default: the single available file)."
+
+[commands.recv.flags.out]
+env = "FTNL_OUT"
+aliases = ["out"]
+short = "o"
+type = "string"
+help = "Path to write the downloaded bytes to (default: the declared file name)."
+
+[commands.cancel]
+help = "Cancel a tunnel and invalidate its capabilities."
+
+[commands.completion]
+help = "Print a shell completion script for this CLI."
+
+[commands.completion.flags.shell]
+env = "FTNL_COMPLETION_SHELL"
+aliases = ["shell"]
+short = "s"
+type = "string"
+default = "bash"
+help = "Shell dialect to emit: bash or zsh."
+
+[flags.url]
+env = "FTNL_BASE_URL"
+aliases = ["url"]
+short = "u"
+type = "string"
+default = "https://api.file-tunnel.dev"
+help = "Base URL of the File Tunnel control plane."
+
+[flags.tunnel]
+env = "FTNL_TUNNEL_ID"
+aliases = ["tunnel"]
+short = "t"
+type = "string"
+help = "Tunnel UUID. Required by every command except create and completion."
+
+[flags.timeout]
+env = "FTNL_TIMEOUT_MS"
+aliases = ["timeout"]
+type = "integer"
+default = 30000
+help = "Per-request timeout in milliseconds (100 through 600000)."
+
+[flags.json]
+env = "FTNL_JSON"
+aliases = ["json"]
+short = "j"
+type = "bool"
+default = false
+true_aliases = ["1", "yes", "on"]
+false_aliases = ["0", "no", "off"]
+help = "Emit machine-readable JSON instead of the human table."

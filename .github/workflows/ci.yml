@@ -1,0 +1,78 @@
+# CI for the ftnl CLI.
+#
+# Three things are checked that a plain `cargo test` would not catch:
+#   * `.cli-flags.toml` passes the flags-2-env audit (ambiguous aliases,
+#     duplicate shorts, colliding env targets);
+#   * `src/cli_config.rs` still matches what the generator emits from that
+#     contract, so the typed struct cannot drift from the flags;
+#   * the `.zpkg.toml` org dependency graph is exactly what it should be.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  contract:
+    name: cli contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build the flags-2-env generator
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/ORESoftware/flags-2-env.git /tmp/flags-2-env
+          git -C /tmp/flags-2-env fetch --depth 1 origin "$FLAGS2ENV_REV"
+          git -C /tmp/flags-2-env checkout --detach FETCH_HEAD
+          make -C /tmp/flags-2-env cli
+        env:
+          # Keep in step with the `flags2env` rev pinned in Cargo.toml, so the
+          # audit and the linked parser are the same build.
+          FLAGS2ENV_REV: 8a978aef0cc9b12bdd0791d93bbf3a374c517ee2
+      - name: Audit the CLI contract
+        run: /tmp/flags-2-env/build/flags2env audit .cli-flags.toml
+      - name: Check the generated typed config for drift
+        run: |
+          set -euo pipefail
+          diff -u src/cli_config.rs \
+            <(/tmp/flags-2-env/build/flags2env generate rust .cli-flags.toml --name CliConfig)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate the zed dependency graph
+        run: python3 scripts/check-zed-dependencies.py
+
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets --locked -- -D warnings
+      - run: cargo test --all-targets --locked

@@ -1,0 +1,5 @@
+# Pinned so the vendored C parser in flags2env and the Rust edition below are
+# built by the same compiler everywhere.
+[toolchain]
+channel = "stable"
+components = ["clippy", "rustfmt"]
