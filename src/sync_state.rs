@@ -141,14 +141,14 @@ fn private_create_new(path: &Path) -> std::io::Result<fs::File> {
     options.open(path)
 }
 
-fn make_private_file(path: &Path) -> Result<(), CliError> {
+fn make_private_file(_path: &Path) -> Result<(), CliError> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).map_err(|error| {
+        fs::set_permissions(_path, fs::Permissions::from_mode(0o600)).map_err(|error| {
             CliError::runtime(format!(
                 "cannot restrict durable upload database {}: {error}",
-                path.display()
+                _path.display()
             ))
         })?;
     }
