@@ -101,7 +101,7 @@ pub fn dispatch(args: &CliArgs, config_path: &Path) -> Result<i32, CliError> {
 }
 
 fn client(args: &CliArgs) -> Result<FileTunnelClient, CliError> {
-    FileTunnelClient::new(&args.base_url)
+    FileTunnelClient::with_timeout(&args.base_url, args.timeout)
         .map_err(|error| CliError::usage(format!("invalid --url: {error}")))
 }
 

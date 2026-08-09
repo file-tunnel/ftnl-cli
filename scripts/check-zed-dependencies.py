@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED: dict[str, str] = {
     "file-tunnel/ftnl-interfaces": "ftnl-interfaces",
     "file-tunnel/ftnl-clients": "ftnl-client",
+    "file-tunnel/ftnl-sync": "ftnl-sync",
 }
 
 PACKAGE_NAME = "ftnl-cli"

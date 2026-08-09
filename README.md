@@ -18,6 +18,11 @@ export FTNL_PAIRING_URI='ftnl://…'  # printed by create; a one-time secret
 
 # phone: claim, declare, and upload in one step
 ftnl send --tunnel 6f1c… --file ./photo.png --media-type image/png
+# queued upload job 7f84…; resume with --job-id 7f84… if interrupted
+
+# after an interrupted process/network attempt, reuse the durable job
+# (set FTNL_CAPABILITY to the capability returned by the successful claim)
+ftnl send --tunnel 6f1c… --file ./photo.png --media-type image/png --job-id 7f84…
 
 # desktop: watch, then fetch
 ftnl status --tunnel 6f1c…
@@ -25,6 +30,9 @@ ftnl recv   --tunnel 6f1c… --out ./photo.png
 
 ftnl cancel --tunnel 6f1c…
 ```
+
+`recv` refuses to overwrite an existing path. Use `--force` only when atomic
+replacement is intended.
 
 ## Credentials are environment-only, by design
 
@@ -56,6 +64,7 @@ flag maps to an environment variable, and precedence is
 export FTNL_BASE_URL=https://api.file-tunnel.dev   # = --url / -u
 export FTNL_TIMEOUT_MS=15000                       # = --timeout
 export FTNL_JSON=1                                 # = --json / -j
+export FTNL_STATE_DIR="$PWD/.ftnl-state"            # = --state-dir
 ftnl status --tunnel 6f1c…                         # uses the environment
 ftnl status --tunnel 6f1c… --timeout 5000          # the flag still wins
 ```
@@ -103,7 +112,7 @@ flags2env generate rust .cli-flags.toml --name CliConfig > src/cli_config.rs
 ## Org dependencies
 
 This CLI sits at the bottom of the File Tunnel stack and owns no routes, header
-names, or retry policy of its own. The same two edges are declared in
+names, or reconciliation algorithms of its own. The same three edges are declared in
 [`Cargo.toml`](Cargo.toml) (pinned by full commit rev) and in
 [`.zpkg.toml`](.zpkg.toml) as the [zed](https://github.com/zed-pkg/zed-cli)
 dependency graph:
@@ -112,9 +121,9 @@ dependency graph:
 [dependencies]
 "file-tunnel/ftnl-interfaces" = "^0.1.0"   # wire shapes: TunnelStatus, FileStatus
 "file-tunnel/ftnl-clients" = "^0.1.0"      # transport: every request goes through it
+"file-tunnel/ftnl-sync" = "^0.1.0"         # protocol-v1 SQLite upload metadata
 ```
 
-`file-tunnel` has no `ftnl-lib`; when one lands it belongs between those two.
 [`scripts/check-zed-dependencies.py`](scripts/check-zed-dependencies.py) fails CI
 if the two manifests disagree, or if a declared zed edge is not also a real Cargo
 dependency — a manifest that names a repo that does not exist looks right and
@@ -124,6 +133,24 @@ Status strings from the transport are decoded against the shared
 `ftnl-interfaces` enums in [`src/status.rs`](src/status.rs) rather than compared
 to string literals. A status this build does not recognise is shown verbatim, not
 rejected: the contract says clients must ignore what they do not know.
+
+## Durable upload jobs
+
+Before `send` makes a network request, it creates a metadata-only job through
+`ftnl-sync` and prints the UUID needed to resume it. Declare, upload, failure,
+and completion transitions are committed to Opto-Sync's protocol-v1 SQLite
+store with a persisted hybrid logical clock. A resumed job with a server file
+ID skips redeclaration; a completed local job returns idempotently.
+
+The queue contains file name/type/size, tunnel and file IDs, lifecycle state,
+and redacted failure codes. It never receives the local path, bytes,
+capability, pairing URI, event ticket, or provider URL. Those remain process or
+OS-owned. The database defaults to the platform state directory; override it
+with `FTNL_STATE_DIR`/`--state-dir` for a portable installation.
+
+Download output is staged beside the destination, flushed, size-checked, and
+atomically persisted. A server-provided name must be one normal path component,
+so it cannot escape the working directory.
 
 ## Layout
 
@@ -138,6 +165,7 @@ No module does two jobs, and `main.rs` does almost nothing:
 | `src/help.rs` | help tables + completion scripts from the native core |
 | `src/secrets.rs` | environment-only credentials |
 | `src/status.rs` | typed tunnel/file status from `ftnl-interfaces` |
+| `src/sync_state.rs` | private state directory, stable writer ID, `ftnl-sync` queue |
 | `src/commands/` | one module per subcommand |
 | `src/output.rs` / `src/error.rs` | human-vs-JSON, and `CliError` |
 

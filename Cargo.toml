@@ -34,15 +34,14 @@ flags2env = { git = "https://github.com/ORESoftware/flags-2-env.git", rev = "8c8
 ftnl-interfaces = { git = "https://github.com/file-tunnel/ftnl-interfaces.git", rev = "22cd738ac574e41b6a04188181387722fe709716" }
 # Transport: every request goes through the org client, so routes, capability
 # headers, and error mapping stay defined in one place.
-ftnl-client = { git = "https://github.com/file-tunnel/ftnl-clients.git", rev = "12bfc301f74cf103478966ae58ed80375459bbb2" }
+ftnl-client = { git = "https://github.com/file-tunnel/ftnl-clients.git", rev = "a93812ff94e604b2ccd7736c2e1d8ae8bbea2978" }
+# Durable protocol-v1 upload metadata and crash-safe SQLite queue. File bytes,
+# paths, and capabilities remain outside this store.
+ftnl-sync = { git = "https://github.com/file-tunnel/ftnl-sync.git", rev = "d8fb9fff40032f61b8604dffd43dc94a4ca888f8", features = ["opto"] }
 
 bytes = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-uuid = { version = "1", features = ["serde"] }
-
-[dev-dependencies]
-# `v4` is test-only: the CLI never mints an id, it only parses ones the server
-# issued.
+tempfile = "3"
 uuid = { version = "1", features = ["serde", "v4"] }

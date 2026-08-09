@@ -35,6 +35,7 @@ pub mod help;
 pub mod output;
 pub mod secrets;
 pub mod status;
+pub mod sync_state;
 
 pub use error::CliError;
 pub use output::{Format, Report};
