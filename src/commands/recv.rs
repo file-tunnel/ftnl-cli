@@ -6,6 +6,8 @@
 
 use ftnl_client::{FileDescriptor, FileTunnelClient};
 use serde::Serialize;
+use std::io::Write;
+use std::path::{Component, Path, PathBuf};
 use uuid::Uuid;
 
 use crate::commands::request_failed;
@@ -46,16 +48,23 @@ pub async fn run(client: &FileTunnelClient, args: &CliArgs) -> Result<i32, CliEr
     let destination = args
         .out
         .clone()
-        .unwrap_or_else(|| std::path::PathBuf::from(&file.name));
+        .map(Ok)
+        .unwrap_or_else(|| safe_default_destination(&file.name))?;
 
     let bytes = client
         .download(tunnel_id, file.file_id, &capability)
         .await
         .map_err(|error| request_failed("downloading the file", &error))?;
 
-    std::fs::write(&destination, &bytes).map_err(|error| {
-        CliError::runtime(format!("cannot write {}: {error}", destination.display()))
-    })?;
+    let received_size = u64::try_from(bytes.len())
+        .map_err(|_| CliError::runtime("downloaded file length does not fit u64"))?;
+    if received_size != file.size_bytes {
+        return Err(CliError::runtime(format!(
+            "downloaded byte count did not match declared size (expected {}, received {})",
+            file.size_bytes, received_size
+        )));
+    }
+    write_atomically(&destination, &bytes, args.force)?;
 
     emit(
         &Received {
@@ -63,10 +72,70 @@ pub async fn run(client: &FileTunnelClient, args: &CliArgs) -> Result<i32, CliEr
             file_id: file.file_id.to_string(),
             name: file.name.clone(),
             written_to: destination.display().to_string(),
-            size_bytes: bytes.len() as u64,
+            size_bytes: received_size,
         },
         Format::from_json_flag(args.json),
     )
+}
+
+fn safe_default_destination(name: &str) -> Result<PathBuf, CliError> {
+    let path = Path::new(name);
+    let mut components = path.components();
+    match (components.next(), components.next()) {
+        (Some(Component::Normal(component)), None) if !component.is_empty() => {
+            Ok(PathBuf::from(component))
+        }
+        _ => Err(CliError::runtime(
+            "server returned an unsafe file name; provide an explicit --out path",
+        )),
+    }
+}
+
+fn write_atomically(destination: &Path, bytes: &[u8], force: bool) -> Result<(), CliError> {
+    let parent = destination
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty());
+    let parent = parent.unwrap_or_else(|| Path::new("."));
+    if !parent.is_dir() {
+        return Err(CliError::runtime(format!(
+            "output directory {} does not exist",
+            parent.display()
+        )));
+    }
+    let mut temporary = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
+        CliError::runtime(format!(
+            "cannot create a temporary output beside {}: {error}",
+            destination.display()
+        ))
+    })?;
+    temporary
+        .write_all(bytes)
+        .and_then(|_| temporary.as_file().sync_all())
+        .map_err(|error| {
+            CliError::runtime(format!(
+                "cannot write temporary output for {}: {error}",
+                destination.display()
+            ))
+        })?;
+    let result = if force {
+        temporary.persist(destination)
+    } else {
+        temporary.persist_noclobber(destination)
+    };
+    result.map_err(|error| {
+        let action = if force { "replace" } else { "create" };
+        CliError::runtime(format!(
+            "cannot {action} {} atomically: {}{}",
+            destination.display(),
+            error.error,
+            if force {
+                ""
+            } else {
+                " (use --force to replace an existing file)"
+            }
+        ))
+    })?;
+    Ok(())
 }
 
 /// Resolves `--file-id`, or the single downloadable file when it is omitted.
@@ -151,5 +220,27 @@ mod tests {
         let files = vec![descriptor("a.png", "uploading")];
         assert!(choose_file(&files, None).is_err());
         assert!(choose_file(&[], None).is_err());
+    }
+
+    #[test]
+    fn default_destination_rejects_paths_from_the_server() {
+        assert_eq!(
+            safe_default_destination("photo.jpg").unwrap(),
+            PathBuf::from("photo.jpg")
+        );
+        assert!(safe_default_destination("../photo.jpg").is_err());
+        assert!(safe_default_destination("folder/photo.jpg").is_err());
+        assert!(safe_default_destination("/tmp/photo.jpg").is_err());
+    }
+
+    #[test]
+    fn atomic_write_refuses_overwrite_without_force() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("photo.jpg");
+        write_atomically(&destination, b"first", false).unwrap();
+        assert!(write_atomically(&destination, b"second", false).is_err());
+        assert_eq!(std::fs::read(&destination).unwrap(), b"first");
+        write_atomically(&destination, b"second", true).unwrap();
+        assert_eq!(std::fs::read(&destination).unwrap(), b"second");
     }
 }

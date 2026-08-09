@@ -6,5 +6,6 @@
 .zed/
 .zed-pack/
 .vendor/.zed/
+.ftnl-state/
 *.log
 .DS_Store

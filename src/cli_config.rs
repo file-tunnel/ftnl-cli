@@ -18,15 +18,21 @@ pub struct CliConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub FTNL_MEDIA_TYPE: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub FTNL_JOB_ID: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub FTNL_FILE_ID: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub FTNL_OUT: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub FTNL_FORCE: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub FTNL_COMPLETION_SHELL: Option<String>,
     pub FTNL_BASE_URL: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub FTNL_TUNNEL_ID: Option<String>,
     pub FTNL_TIMEOUT_MS: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub FTNL_STATE_DIR: Option<String>,
     pub FTNL_JSON: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub FLAGS2ENV_COMMAND: Option<String>,

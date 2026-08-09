@@ -37,6 +37,7 @@ pub struct CliArgs {
     /// Parsed once here so no command has to re-validate the UUID.
     pub tunnel: Option<Uuid>,
     pub timeout: Duration,
+    pub state_dir: Option<PathBuf>,
     pub json: bool,
 
     // `create`
@@ -49,10 +50,12 @@ pub struct CliArgs {
     // `send`
     pub file: Option<PathBuf>,
     pub media_type: String,
+    pub job_id: Option<Uuid>,
 
     // `recv`
     pub file_id: Option<Uuid>,
     pub out: Option<PathBuf>,
+    pub force: bool,
 
     // `completion`
     pub shell: String,
@@ -177,6 +180,7 @@ fn parse_cli_args_with_env(
 
     let tunnel = optional_uuid(typed.FTNL_TUNNEL_ID.as_deref(), "--tunnel")?;
     let file_id = optional_uuid(typed.FTNL_FILE_ID.as_deref(), "--file-id")?;
+    let job_id = optional_uuid(typed.FTNL_JOB_ID.as_deref(), "--job-id")?;
 
     let timeout_ms = bounded(typed.FTNL_TIMEOUT_MS, "FTNL_TIMEOUT_MS", 100, 600_000)?;
 
@@ -236,6 +240,7 @@ fn parse_cli_args_with_env(
         base_url,
         tunnel,
         timeout: Duration::from_millis(timeout_ms as u64),
+        state_dir: typed.FTNL_STATE_DIR.map(PathBuf::from),
         json: typed.FTNL_JSON,
         application_id,
         accept,
@@ -246,8 +251,10 @@ fn parse_cli_args_with_env(
         media_type: typed
             .FTNL_MEDIA_TYPE
             .unwrap_or_else(|| "application/octet-stream".to_owned()),
+        job_id,
         file_id,
         out: typed.FTNL_OUT.map(PathBuf::from),
+        force: typed.FTNL_FORCE.unwrap_or(false),
         shell,
     })
 }
