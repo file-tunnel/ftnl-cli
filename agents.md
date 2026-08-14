@@ -19,6 +19,5 @@ These instructions apply to this repository and every directory beneath it.
 - Run `nix develop --command agent-check` before publishing; it covers format,
   locked Clippy/tests, generated-config diff, dependency validation, and
   actionlint.
-- Pull and merge remote work before pushing; avoid git rebase in favor of git
-  merge.
+- Pull and merge remote work before pushing; avoid git rebase in favor of git merge.
 - Never discard unrelated or uncommitted user work.
