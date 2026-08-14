@@ -181,6 +181,12 @@ cargo clippy --all-targets --locked -- -D warnings
 python3 scripts/check-zed-dependencies.py   # needs Python 3.11+
 ```
 
+The reproducible full repository gate is:
+
+```sh
+nix develop --command agent-check
+```
+
 Building compiles the vendored C parser that `flags2env` links statically, so the
 released binary needs no `libflags2env` at runtime. The Rust `cc` crate picks the
 platform compiler; a packaged `ftnl` binary needs no compiler installed.
