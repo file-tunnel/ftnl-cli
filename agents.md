@@ -16,5 +16,9 @@ These instructions apply to this repository and every directory beneath it.
   Preserve atomic output and no-clobber-by-default behavior.
 - `.zpkg.toml` edges must correspond to real Cargo dependencies. Do not edit
   `.zpkg.lock` or materialize `zed_modules` as part of application changes.
-- Run format, locked Clippy/tests, generated-config diff, dependency validation,
-  and actionlint before publishing.
+- Run `nix develop --command agent-check` before publishing; it covers format,
+  locked Clippy/tests, generated-config diff, dependency validation, and
+  actionlint.
+- Integrate shared branch history with merge commits when necessary.
+
+avoid git rebase in favor of git merge.
