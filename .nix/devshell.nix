@@ -1,6 +1,10 @@
 { pkgs, agentCheck }:
 pkgs.mkShell {
   packages = [
+    # encrypted env files — env/enc/*.env.enc, see env/README.md
+    pkgs.sops
+    pkgs.age
+    pkgs.just
     agentCheck
   ]
   ++ (with pkgs; [
