@@ -41,4 +41,3 @@ exclude = [".env", ".env.*", ".direnv/**", ".zed/**", ".zed-pack/**", ".vendor/.
 [scripts]
 test = "cargo test --all-targets --locked"
 lint = "cargo clippy --all-targets --locked -- -D warnings"
-check-deps = "python3 scripts/check-zed-dependencies.py"
