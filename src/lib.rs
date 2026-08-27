@@ -29,6 +29,7 @@
 // because a scoped default only applies when its own command runs.
 pub mod cli_config;
 pub mod commands;
+pub mod env_map;
 pub mod error;
 pub mod flags;
 pub mod help;

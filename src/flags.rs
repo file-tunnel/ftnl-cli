@@ -17,10 +17,11 @@
 //!
 //! Credentials never appear in any of this — see [`crate::secrets`].
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use crate::env_map::{get_env_map, process_env_map, EnvMap};
 use flags2env::BundledFlags2Env;
 use uuid::Uuid;
 
@@ -108,9 +109,7 @@ pub fn resolve_config_path() -> Result<PathBuf, String> {
 }
 
 pub fn parse_cli_args(argv: &[String], config_path: &Path) -> Result<CliArgs, String> {
-    let environment = std::env::vars_os()
-        .filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)));
-    parse_cli_args_with_env(argv, config_path, environment)
+    parse_cli_args_with_env(argv, config_path, process_env_map())
 }
 
 fn parse_cli_args_with_env(
@@ -155,10 +154,10 @@ fn parse_cli_args_with_env(
         ));
     }
 
-    let mut raw_config = environment.into_iter().collect::<HashMap<_, _>>();
+    let mut initial: EnvMap = environment.into_iter().collect();
     // Command metadata is parser output, never operator input.
-    raw_config.remove("FLAGS2ENV_COMMAND");
-    raw_config.extend(parsed.provided_flags);
+    initial.remove("FLAGS2ENV_COMMAND");
+    let raw_config = get_env_map(initial, parsed.provided_flags);
     let typed = parser
         .coerce::<CliConfig, _>(&raw_config, Some(config_path))
         .map_err(|error| format!("invalid typed configuration: {error}"))?;
@@ -443,5 +442,13 @@ mod tests {
 
         assert!(parse(&["ftnl", "create", "--app=d", "--accept=[1]"], &[]).is_err());
         assert!(parse(&["ftnl", "create", "--app=d", "--accept=[]"], &[]).is_err());
+    }
+
+    #[test]
+    fn source_does_not_mutate_process_environment() {
+        const SRC: &str = include_str!("flags.rs");
+        let production = SRC.split("#[cfg(test)]").next().unwrap_or(SRC);
+        assert!(!production.contains("std::env::set_var"));
+        assert!(!production.contains("env::set_var"));
     }
 }
