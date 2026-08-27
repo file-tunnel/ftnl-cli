@@ -39,7 +39,7 @@ pub struct Snapshot {
 
 impl Report for Snapshot {
     fn render_human(&self) -> String {
-        let mut out = format!(
+        let header = format!(
             "tunnel     {}\nstatus     {}{}\nexpires at {}\nfiles      {}",
             self.tunnel_id,
             self.status,
@@ -51,23 +51,86 @@ impl Report for Snapshot {
             self.expires_at,
             self.files.len(),
         );
-        if !self.files.is_empty() {
-            out.push_str(&format!(
-                "\n\n{:<38} {:>12} {:>12}  {:<12} name",
-                "file id", "size", "transferred", "status"
-            ));
-            for file in &self.files {
-                out.push_str(&format!(
-                    "\n{:<38} {:>12} {:>12}  {:<12} {}",
-                    file.file_id, file.size_bytes, file.bytes_transferred, file.status, file.name
-                ));
-            }
+        if self.files.is_empty() {
+            return header;
         }
-        out
+        let table = std::iter::once(format!(
+            "{:<38} {:>12} {:>12}  {:<12} name",
+            "file id", "size", "transferred", "status"
+        ))
+        .chain(self.files.iter().map(|file| {
+            format!(
+                "{:<38} {:>12} {:>12}  {:<12} {}",
+                file.file_id, file.size_bytes, file.bytes_transferred, file.status, file.name
+            )
+        }))
+        .collect::<Vec<_>>()
+        .join("\n");
+        format!("{header}\n\n{table}")
     }
 
     fn exit_code(&self) -> i32 {
         i32::from(self.terminal)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn file_row(file_id: &str, name: &str) -> FileRow {
+        FileRow {
+            file_id: file_id.to_owned(),
+            name: name.to_owned(),
+            media_type: "application/octet-stream".to_owned(),
+            size_bytes: 12,
+            bytes_transferred: 4,
+            status: "uploading".to_owned(),
+            known_status: true,
+        }
+    }
+
+    fn snapshot(files: Vec<FileRow>) -> Snapshot {
+        Snapshot {
+            tunnel_id: "tunnel-1".to_owned(),
+            status: "open".to_owned(),
+            known_status: true,
+            terminal: false,
+            expires_at: "2026-01-01T00:00:00Z".to_owned(),
+            files,
+        }
+    }
+
+    #[test]
+    fn a_tunnel_without_files_renders_only_the_header() {
+        let rendered = snapshot(Vec::new()).render_human();
+        assert_eq!(
+            rendered,
+            "tunnel     tunnel-1\nstatus     open\nexpires at 2026-01-01T00:00:00Z\nfiles      0"
+        );
+    }
+
+    #[test]
+    fn file_rows_follow_one_blank_line_and_a_single_header_row() {
+        let rendered =
+            snapshot(vec![file_row("f-1", "a.png"), file_row("f-2", "b.png")]).render_human();
+        let lines = rendered.lines().collect::<Vec<_>>();
+        assert_eq!(lines.len(), 8);
+        assert_eq!(lines[3], "files      2");
+        assert_eq!(lines[4], "");
+        assert!(lines[5].starts_with("file id"));
+        assert!(lines[6].starts_with("f-1"));
+        assert!(lines[7].ends_with("b.png"));
+    }
+
+    #[test]
+    fn an_unrecognised_status_is_reported_verbatim_with_a_note() {
+        let mut report = snapshot(Vec::new());
+        report.status = "quiesced".to_owned();
+        report.known_status = false;
+        assert!(report
+            .render_human()
+            .contains("status     quiesced  (unrecognised by this build)"));
     }
 }
 

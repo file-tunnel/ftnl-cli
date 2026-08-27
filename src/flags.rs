@@ -88,19 +88,21 @@ pub fn resolve_config_path() -> Result<PathBuf, String> {
             .ok_or_else(|| "FTNL_FLAGS_CONFIG does not point to a readable file".to_owned());
     }
 
-    let mut candidates = Vec::new();
-    if let Ok(current) = std::env::current_dir() {
-        candidates.push(current.join(".cli-flags.toml"));
-    }
-    if let Ok(executable) = std::env::current_exe() {
-        if let Some(parent) = executable.parent() {
-            candidates.push(parent.join(".cli-flags.toml"));
-            candidates.push(parent.join("../share/ftnl-cli/.cli-flags.toml"));
-        }
-    }
+    let from_working_directory = std::env::current_dir()
+        .ok()
+        .map(|current| current.join(".cli-flags.toml"));
+    let beside_executable = std::env::current_exe().ok().and_then(|executable| {
+        executable.parent().map(|parent| {
+            [
+                parent.join(".cli-flags.toml"),
+                parent.join("../share/ftnl-cli/.cli-flags.toml"),
+            ]
+        })
+    });
 
-    candidates
+    from_working_directory
         .into_iter()
+        .chain(beside_executable.into_iter().flatten())
         .find(|candidate| candidate.is_file())
         .ok_or_else(|| {
             "cannot locate .cli-flags.toml; set FTNL_FLAGS_CONFIG to its path".to_owned()
