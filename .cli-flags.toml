@@ -162,3 +162,22 @@ default = false
 true_aliases = ["1", "yes", "on"]
 false_aliases = ["0", "no", "off"]
 help = "Emit machine-readable JSON instead of the human table."
+
+
+[flags.ftnl-flags-config]
+env = "FTNL_FLAGS_CONFIG"
+long = "ftnl-flags-config"
+type = "string"
+help = "Runtime environment key FTNL_FLAGS_CONFIG."
+
+[flags.localappdata]
+env = "LOCALAPPDATA"
+long = "localappdata"
+type = "string"
+help = "Runtime environment key LOCALAPPDATA."
+
+[flags.xdg-state-home]
+env = "XDG_STATE_HOME"
+long = "xdg-state-home"
+type = "string"
+help = "Runtime environment key XDG_STATE_HOME."
