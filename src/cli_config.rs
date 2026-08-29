@@ -35,5 +35,11 @@ pub struct CliConfig {
     pub FTNL_STATE_DIR: Option<String>,
     pub FTNL_JSON: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub FTNL_FLAGS_CONFIG: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub LOCALAPPDATA: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub XDG_STATE_HOME: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub FLAGS2ENV_COMMAND: Option<String>,
 }

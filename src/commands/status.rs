@@ -74,6 +74,42 @@ impl Report for Snapshot {
     }
 }
 
+pub async fn run(client: &FileTunnelClient, args: &CliArgs) -> Result<i32, CliError> {
+    let tunnel_id = args.require_tunnel()?;
+    let capability = secrets::capability()?;
+
+    let snapshot = client
+        .snapshot(tunnel_id, &capability)
+        .await
+        .map_err(|error| request_failed("reading the tunnel snapshot", &error))?;
+
+    let report = Snapshot {
+        tunnel_id: snapshot.tunnel_id.to_string(),
+        known_status: crate::status::tunnel_status(&snapshot.status)
+            .as_known()
+            .is_some(),
+        terminal: is_terminal(&snapshot.status),
+        status: snapshot.status,
+        expires_at: snapshot.expires_at,
+        files: snapshot
+            .files
+            .into_iter()
+            .map(|file| FileRow {
+                file_id: file.file_id.to_string(),
+                name: file.name,
+                media_type: file.media_type,
+                size_bytes: file.size_bytes,
+                bytes_transferred: file.bytes_transferred,
+                known_status: crate::status::file_status(&file.status)
+                    .as_known()
+                    .is_some(),
+                status: file.status,
+            })
+            .collect(),
+    };
+    emit(&report, Format::from_json_flag(args.json))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,40 +168,4 @@ mod tests {
             .render_human()
             .contains("status     quiesced  (unrecognised by this build)"));
     }
-}
-
-pub async fn run(client: &FileTunnelClient, args: &CliArgs) -> Result<i32, CliError> {
-    let tunnel_id = args.require_tunnel()?;
-    let capability = secrets::capability()?;
-
-    let snapshot = client
-        .snapshot(tunnel_id, &capability)
-        .await
-        .map_err(|error| request_failed("reading the tunnel snapshot", &error))?;
-
-    let report = Snapshot {
-        tunnel_id: snapshot.tunnel_id.to_string(),
-        known_status: crate::status::tunnel_status(&snapshot.status)
-            .as_known()
-            .is_some(),
-        terminal: is_terminal(&snapshot.status),
-        status: snapshot.status,
-        expires_at: snapshot.expires_at,
-        files: snapshot
-            .files
-            .into_iter()
-            .map(|file| FileRow {
-                file_id: file.file_id.to_string(),
-                name: file.name,
-                media_type: file.media_type,
-                size_bytes: file.size_bytes,
-                bytes_transferred: file.bytes_transferred,
-                known_status: crate::status::file_status(&file.status)
-                    .as_known()
-                    .is_some(),
-                status: file.status,
-            })
-            .collect(),
-    };
-    emit(&report, Format::from_json_flag(args.json))
 }
