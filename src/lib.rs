@@ -18,6 +18,7 @@
 //! | [`commands`] | one module per subcommand, each returning an [`output::Report`] |
 //! | [`output`] | human table vs. `--json` |
 //! | [`error`] | [`error::CliError`] and the exit codes it maps to |
+//! | [`telemetry`] | bounded lifecycle events for an injected next-loggers transport |
 //!
 //! Every request goes through `ftnl-client`; this crate contains no routes,
 //! no header names, and no retry policy of its own.
@@ -36,6 +37,7 @@ pub mod output;
 pub mod secrets;
 pub mod status;
 pub mod sync_state;
+pub mod telemetry;
 
 pub use error::CliError;
 pub use output::{Format, Report};
@@ -44,7 +46,32 @@ pub use output::{Format, Report};
 pub const PROGRAM: &str = "ftnl";
 
 /// Parses `argv`, runs the selected command, and returns the process exit code.
+///
+/// The stock binary uses a no-op transport. Embedders that own an
+/// `ores.otel.log` or OpenTelemetry provider should call
+/// [`run_with_telemetry`] and inject the adapter explicitly.
 pub fn run(argv: &[String]) -> i32 {
+    let telemetry = telemetry::CliTelemetry::new(telemetry::NoopNextLoggersTransport);
+    run_with_telemetry(argv, &telemetry)
+}
+
+/// Runs the CLI while emitting only bounded, metadata-minimal lifecycle events.
+///
+/// Telemetry delivery is best-effort and cannot change the command's exit
+/// status. The transport never receives argv, error strings, capabilities,
+/// pairing fragments, tickets, filenames, paths, file metadata, or content.
+pub fn run_with_telemetry<T>(argv: &[String], telemetry: &telemetry::CliTelemetry<T>) -> i32
+where
+    T: telemetry::NextLoggersTransport,
+{
+    let _ = telemetry.invocation_started();
+    let exit_code = run_without_telemetry(argv);
+    let _ = telemetry.invocation_finished(exit_code);
+    let _ = telemetry.flush();
+    exit_code
+}
+
+fn run_without_telemetry(argv: &[String]) -> i32 {
     let config_path = match flags::resolve_config_path() {
         Ok(path) => path,
         Err(error) => return report(&CliError::config(error), None, argv),
