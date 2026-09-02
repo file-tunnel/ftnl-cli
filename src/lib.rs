@@ -60,10 +60,7 @@ pub fn run(argv: &[String]) -> i32 {
 /// Telemetry delivery is best-effort and cannot change the command's exit
 /// status. The transport never receives argv, error strings, capabilities,
 /// pairing fragments, tickets, filenames, paths, file metadata, or content.
-pub fn run_with_telemetry<T>(
-    argv: &[String],
-    telemetry: &telemetry::CliTelemetry<T>,
-) -> i32
+pub fn run_with_telemetry<T>(argv: &[String], telemetry: &telemetry::CliTelemetry<T>) -> i32
 where
     T: telemetry::NextLoggersTransport,
 {
