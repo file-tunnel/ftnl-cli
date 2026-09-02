@@ -164,7 +164,8 @@ where
     }
 
     pub fn invocation_finished(&self, exit_code: i32) -> Result<(), T::Error> {
-        self.transport.write(&CliTelemetryEvent::finished(exit_code))
+        self.transport
+            .write(&CliTelemetryEvent::finished(exit_code))
     }
 
     pub fn flush(&self) -> Result<(), T::Error> {
