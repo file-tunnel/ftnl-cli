@@ -56,7 +56,7 @@ credential into a query parameter.
 ## Configuration — flags-2-env
 
 Flags are declared once in [`.cli-flags.toml`](.cli-flags.toml), the
-[flags-2-env](https://github.com/ORESoftware/flags-2-env) config format. Each
+[flags-2-env](https://github.com/flags-2-env/flags-2-env) config format. Each
 flag maps to an environment variable, and precedence is
 **CLI flags > environment > TOML defaults**:
 

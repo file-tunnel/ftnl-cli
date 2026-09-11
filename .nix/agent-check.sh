@@ -19,3 +19,5 @@ make -C "$work_dir/flags-2-env" cli
 diff -u src/cli_config.rs <(
   "$work_dir/flags-2-env/build/flags2env" generate rust .cli-flags.toml --name CliConfig
 )
+scripts/freeze-generated.sh --freeze
+scripts/freeze-generated.sh --check

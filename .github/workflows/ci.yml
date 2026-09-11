@@ -36,7 +36,10 @@ jobs:
       - name: Build the flags-2-env generator
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/ORESoftware/flags-2-env.git /tmp/flags-2-env
+          git init /tmp/flags-2-env
+          git -C /tmp/flags-2-env remote add origin https://github.com/flags-2-env/flags-2-env.git
+          git -C /tmp/flags-2-env fetch --depth 1 origin 8c8465561075a8d7ebb58074b3a8087138e97d8f
+          git -C /tmp/flags-2-env checkout --detach FETCH_HEAD
           git -C /tmp/flags-2-env fetch --depth 1 origin "$FLAGS2ENV_REV"
           git -C /tmp/flags-2-env checkout --detach FETCH_HEAD
           make -C /tmp/flags-2-env cli
