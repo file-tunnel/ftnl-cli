@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Freeze or thaw the one generated source file owned by `.cli-flags.toml`.
-# Git does not persist write bits, so validation reapplies the frozen policy
-# after checkout. The marker check fails closed before permissions are changed.
+# Freeze or thaw generated output and the typed source owned by
+# `.cli-flags.toml`. Git only stores the executable bit, so validation must
+# reapply the policy after checkout. The marker check fails closed before any
+# permissions are changed.
 set -euo pipefail
 
 root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
@@ -24,11 +25,14 @@ IFS= read -r first_line <"$generated"
 case "$operation" in
   --freeze)
     chmod a-w "$generated"
+    python3 "$root/scripts/check-generated-contract.py" --root "$root" --freeze --require-readonly
     ;;
   --thaw)
     chmod u+w "$generated"
     ;;
-  --check) ;;
+  --check)
+    python3 "$root/scripts/check-generated-contract.py" --root "$root" --require-readonly
+    ;;
   *)
     echo "usage: scripts/freeze-generated.sh [--freeze|--thaw|--check]" >&2
     exit 2
