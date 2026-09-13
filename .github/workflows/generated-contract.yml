@@ -2,27 +2,49 @@ name: generated-contract
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
+    paths:
+      - '.cli-flags.toml'
+      - 'src/cli_config.rs'
+      - 'generated/**'
+      - 'scripts/check-generated-contract.py'
+      - 'scripts/freeze-generated.sh'
+      - '.github/workflows/generated-contract.yml'
   pull_request:
+    paths:
+      - '.cli-flags.toml'
+      - 'src/cli_config.rs'
+      - 'generated/**'
+      - 'scripts/check-generated-contract.py'
+      - 'scripts/freeze-generated.sh'
+      - '.github/workflows/generated-contract.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: generated-contract-${{ github.ref }}
+  group: generated-contract-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   check:
-    name: Runtime generated contract
-    runs-on: ubuntu-latest
+    name: Frozen generated and runtime contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: "3.11"
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
       - name: Install jsonschema
         run: python3 -m pip install --quiet jsonschema
+      - name: Reapply and verify the frozen generated-source policy
+        run: |
+          scripts/freeze-generated.sh --freeze
+          scripts/freeze-generated.sh --check
       - name: Check generated policy, freeze bits, and JSON Schema runtime
         run: python3 scripts/check-generated-contract.py --freeze --require-readonly

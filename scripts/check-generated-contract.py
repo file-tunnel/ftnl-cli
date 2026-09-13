@@ -200,24 +200,151 @@ def jsonschema_validate(instance: Any, schema: dict[str, Any]) -> list[str]:
         return [f"schema rejected by validator: {exc}"]
 
 
-def structural_validate(instance: Any, schema: dict[str, Any]) -> list[str]:
-    """Subset used when the `jsonschema` package is not installed."""
+def _matches_json_type(instance: Any, expected: Any) -> bool:
+    """Return whether *instance* matches a JSON Schema primitive type."""
+    if isinstance(expected, list):
+        return any(_matches_json_type(instance, candidate) for candidate in expected)
+    if expected == "object":
+        return isinstance(instance, dict)
+    if expected == "array":
+        return isinstance(instance, list)
+    if expected == "string":
+        return isinstance(instance, str)
+    if expected == "integer":
+        return isinstance(instance, int) and not isinstance(instance, bool)
+    if expected == "number":
+        return isinstance(instance, (int, float)) and not isinstance(instance, bool)
+    if expected == "boolean":
+        return isinstance(instance, bool)
+    if expected == "null":
+        return instance is None
+    return True
+
+
+def _type_name(instance: Any) -> str:
+    if instance is None:
+        return "null"
+    if isinstance(instance, bool):
+        return "boolean"
+    if isinstance(instance, int):
+        return "integer"
+    if isinstance(instance, float):
+        return "number"
+    if isinstance(instance, str):
+        return "string"
+    if isinstance(instance, list):
+        return "array"
+    if isinstance(instance, dict):
+        return "object"
+    return type(instance).__name__
+
+
+def structural_validate(
+    instance: Any, schema: dict[str, Any], *, path: str = "instance"
+) -> list[str]:
+    """Small, dependency-free subset for the common contract constraints.
+
+    CI installs the full Draft 2020-12 validator. This fallback intentionally
+    covers the constraints needed by generated contract fixtures so
+    ``--self-test`` remains meaningful on a clean machine: types, enums,
+    required/closed object fields, nested properties/items, and basic bounds.
+    Unsupported keywords are left to the full validator rather than guessed.
+    """
+    if not isinstance(schema, dict):
+        return []
+
     errors: list[str] = []
-    if schema.get("type") == "object" and not isinstance(instance, dict):
-        return ["instance is not an object"]
-    if not isinstance(instance, dict) or not isinstance(schema.get("properties"), dict):
+    any_of = schema.get("anyOf")
+    if isinstance(any_of, list) and any_of:
+        if not any(
+            not structural_validate(instance, branch, path=path)
+            for branch in any_of
+            if isinstance(branch, dict)
+        ):
+            errors.append(f"{path}: does not match anyOf")
+            return errors
+
+    one_of = schema.get("oneOf")
+    if isinstance(one_of, list) and one_of:
+        matches = sum(
+            not structural_validate(instance, branch, path=path)
+            for branch in one_of
+            if isinstance(branch, dict)
+        )
+        if matches != 1:
+            errors.append(f"{path}: matches {matches} oneOf branches; expected exactly one")
+            return errors
+
+    expected = schema.get("type")
+    if expected is not None and not _matches_json_type(instance, expected):
+        errors.append(f"{path}: expected {expected!r}, got {_type_name(instance)}")
         return errors
-    required = schema.get("required") or []
-    if isinstance(required, list):
-        for key in required:
-            if key not in instance:
-                errors.append(f"missing required property {key!r}")
-    additional = schema.get("additionalProperties", True)
-    if additional is False:
-        allowed = set(schema["properties"])
-        for key in instance:
-            if key not in allowed:
-                errors.append(f"undeclared property {key!r}")
+
+    if "const" in schema and instance != schema["const"]:
+        errors.append(f"{path}: does not equal the const value")
+    enum = schema.get("enum")
+    if isinstance(enum, list) and instance not in enum:
+        errors.append(f"{path}: is not one of the enum values")
+
+    if isinstance(instance, dict):
+        properties = schema.get("properties")
+        properties = properties if isinstance(properties, dict) else {}
+        required = schema.get("required") or []
+        if isinstance(required, list):
+            for key in required:
+                if key not in instance:
+                    errors.append(f"{path}: missing required property {key!r}")
+        for key, property_schema in properties.items():
+            if key in instance and isinstance(property_schema, dict):
+                errors.extend(
+                    structural_validate(instance[key], property_schema, path=f"{path}.{key}")
+                )
+        additional = schema.get("additionalProperties", True)
+        for key, value in instance.items():
+            if key in properties:
+                continue
+            if additional is False:
+                errors.append(f"{path}: undeclared property {key!r}")
+            elif isinstance(additional, dict):
+                errors.extend(structural_validate(value, additional, path=f"{path}.{key}"))
+
+    if isinstance(instance, list):
+        if isinstance(schema.get("items"), dict):
+            for index, value in enumerate(instance):
+                errors.extend(
+                    structural_validate(value, schema["items"], path=f"{path}[{index}]")
+                )
+        minimum = schema.get("minItems")
+        maximum = schema.get("maxItems")
+        if isinstance(minimum, int) and len(instance) < minimum:
+            errors.append(f"{path}: has fewer than {minimum} items")
+        if isinstance(maximum, int) and len(instance) > maximum:
+            errors.append(f"{path}: has more than {maximum} items")
+
+    if isinstance(instance, str):
+        minimum = schema.get("minLength")
+        maximum = schema.get("maxLength")
+        if isinstance(minimum, int) and len(instance) < minimum:
+            errors.append(f"{path}: is shorter than {minimum} characters")
+        if isinstance(maximum, int) and len(instance) > maximum:
+            errors.append(f"{path}: is longer than {maximum} characters")
+        pattern = schema.get("pattern")
+        if isinstance(pattern, str):
+            try:
+                matches = re.search(pattern, instance)
+            except re.error:
+                matches = True
+            if matches is None:
+                errors.append(f"{path}: does not match the schema pattern")
+
+    if isinstance(instance, (int, float)) and not isinstance(instance, bool):
+        minimum = schema.get("minimum")
+        maximum = schema.get("maximum")
+        if isinstance(minimum, (int, float)) and instance < minimum:
+            errors.append(f"{path}: is below the minimum")
+        if isinstance(maximum, (int, float)) and instance > maximum:
+            errors.append(f"{path}: is above the maximum")
+
     return errors
 
 
