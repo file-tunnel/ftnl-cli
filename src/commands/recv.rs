@@ -234,14 +234,19 @@ mod tests {
     }
 
     #[test]
-    fn atomic_write_refuses_overwrite_without_force() -> Result<(), Box<dyn std::error::Error>> {
-        let directory = tempfile::tempdir()?;
+    fn atomic_write_refuses_overwrite_without_force() -> Result<(), CliError> {
+        let directory = tempfile::tempdir()
+            .map_err(|error| CliError::runtime(format!("temp directory unavailable: {error}")))?;
         let destination = directory.path().join("photo.jpg");
         write_atomically(&destination, b"first", false)?;
         assert!(write_atomically(&destination, b"second", false).is_err());
-        assert_eq!(std::fs::read(&destination)?, b"first");
+        let first = std::fs::read(&destination)
+            .map_err(|error| CliError::runtime(format!("test output unreadable: {error}")))?;
+        assert_eq!(first, b"first");
         write_atomically(&destination, b"second", true)?;
-        assert_eq!(std::fs::read(&destination)?, b"second");
+        let second = std::fs::read(&destination)
+            .map_err(|error| CliError::runtime(format!("test output unreadable: {error}")))?;
+        assert_eq!(second, b"second");
         Ok(())
     }
 }
