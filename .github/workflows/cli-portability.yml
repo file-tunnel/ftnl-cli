@@ -29,12 +29,35 @@ concurrency:
   group: cli-portability-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# The previous ORESoftware/.github reusable is a PRIVATE cross-org workflow:
+# GitHub rejected the call before scheduling jobs (zero jobs executed).
+# Run this caller-owned matrix without tokens or access to other orgs.
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   portability:
-    uses: ORESoftware/.github/.github/workflows/reusable-cli-portability.yml@a44a422bd2e5a26126488c4dbffb17ed320ae957
-    with:
-      language: rust
-      working-directory: .
-      rust-toolchain: stable
-      cargo-locked: true
-      run-smoke: true
+    name: portable Rust CLI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Lint all targets
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Run tests
+        run: cargo test --locked --all-targets
+      - name: Build release CLI
+        run: cargo build --locked --release --bins
+      - name: Smoke CLI help
+        run: cargo run --locked --release -- --help
