@@ -81,14 +81,14 @@ pub async fn run(client: &FileTunnelClient, args: &CliArgs) -> Result<i32, CliEr
 fn safe_default_destination(name: &str) -> Result<PathBuf, CliError> {
     let path = Path::new(name);
     let mut components = path.components();
-    match (components.next(), components.next()) {
-        (Some(Component::Normal(component)), None) if !component.is_empty() => {
-            Ok(PathBuf::from(component))
+    if let (Some(Component::Normal(component)), None) = (components.next(), components.next()) {
+        if !component.is_empty() {
+            return Ok(PathBuf::from(component));
         }
-        _ => Err(CliError::runtime(
-            "server returned an unsafe file name; provide an explicit --out path",
-        )),
     }
+    Err(CliError::runtime(
+        "server returned an unsafe file name; provide an explicit --out path",
+    ))
 }
 
 fn write_atomically(destination: &Path, bytes: &[u8], force: bool) -> Result<(), CliError> {
@@ -234,13 +234,19 @@ mod tests {
     }
 
     #[test]
-    fn atomic_write_refuses_overwrite_without_force() {
-        let directory = tempfile::tempdir().unwrap();
+    fn atomic_write_refuses_overwrite_without_force() -> Result<(), CliError> {
+        let directory = tempfile::tempdir()
+            .map_err(|error| CliError::runtime(format!("temp directory unavailable: {error}")))?;
         let destination = directory.path().join("photo.jpg");
-        write_atomically(&destination, b"first", false).unwrap();
+        write_atomically(&destination, b"first", false)?;
         assert!(write_atomically(&destination, b"second", false).is_err());
-        assert_eq!(std::fs::read(&destination).unwrap(), b"first");
-        write_atomically(&destination, b"second", true).unwrap();
-        assert_eq!(std::fs::read(&destination).unwrap(), b"second");
+        let first = std::fs::read(&destination)
+            .map_err(|error| CliError::runtime(format!("test output unreadable: {error}")))?;
+        assert_eq!(first, b"first");
+        write_atomically(&destination, b"second", true)?;
+        let second = std::fs::read(&destination)
+            .map_err(|error| CliError::runtime(format!("test output unreadable: {error}")))?;
+        assert_eq!(second, b"second");
+        Ok(())
     }
 }
