@@ -56,6 +56,16 @@ pub fn is_terminal(raw: &str) -> bool {
     )
 }
 
+/// True when uploading has reached its terminal transfer phase.
+/// A `complete` tunnel can still contain downloadable files; do not use
+/// this as a replacement for `is_terminal` in CLI polling exit logic.
+pub fn is_transfer_finished(raw: &str) -> bool {
+    matches!(
+        tunnel_status(raw).as_known(),
+        Some(TunnelStatus::Complete | TunnelStatus::Cancelled | TunnelStatus::Expired)
+    )
+}
+
 /// True when a declared file has bytes that can actually be downloaded.
 pub fn is_downloadable(raw: &str) -> bool {
     matches!(
@@ -90,6 +100,16 @@ mod tests {
         );
         assert!(!is_terminal("quantum-entangled"));
         assert!(!is_downloadable("quantum-entangled"));
+    }
+
+    #[test]
+    fn completed_transfer_does_not_imply_downloads_are_finished() {
+        assert!(is_transfer_finished("complete"));
+        assert!(!is_terminal("complete"));
+        assert!(is_transfer_finished("cancelled"));
+        assert!(is_transfer_finished("expired"));
+        assert!(!is_transfer_finished("waiting"));
+        assert!(!is_transfer_finished("future_status"));
     }
 
     #[test]
